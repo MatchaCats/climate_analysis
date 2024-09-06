@@ -29,7 +29,7 @@ def welcome():
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
         f"/api/v1.0/temperature/start<br/>"
-        f"/api/v1.0/temperature/end<br/>"
+        f"/api/v1.0/temperature/start/end<br/>"
         f"<p>The 'start' and 'end' dates should be in this format: MMDDYYYY.</p>",
         200,  # Status code indicating success
         {"Content-Type": "text/html"}  # Headers specifying content type
@@ -56,6 +56,49 @@ def stations():
     stations = list(np.ravel(results))
 
     return jsonify(stations=stations)
+
+@app.route("/api/v1.0/tobs")
+def tobs():
+    last_year = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+
+    results = session.query(Measurement.tobs).\
+        filter(Measurement.station == "USC00519281").\
+        filter(Measurement.date >= last_year).all()
+    
+    session.close()
+
+    temps = list(np.ravel(results))
+
+    return jsonify({ "tobs": temps })
+
+@app.route("/api/v1.0/temp/<start>")
+@app.route("/api/v1.0/temp/<start>/<end>")
+def stats(start = None, end = None):
+
+    sel = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+
+    if not end:
+        start = dt.datetime.strptime(start, "%m%d%Y")
+        results = session.query(*sel).\
+            filter(Measurement.date >= start).all()
+        
+        session.close()
+
+        temps = list(np.ravel(results))
+        return jsonify(temps)
+    
+    start = dt.datetime.strptime(start, "%m%d%Y")
+    end = dt.datetime.strptime(end, "%m%d%Y")
+
+    results = session.query(*sel).\
+        filter(Measurement.date >= start).\
+        filter(Measurement.date <= end).all()
+
+    session.close()
+
+    temps = list(np.ravel(results))
+
+    return jsonify(temps=temps)
 
 if __name__ == "__main__":
     app.run(debug = True)
